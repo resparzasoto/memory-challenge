@@ -23,7 +23,10 @@
   },
   "homepage": "https://github.com/resparzasoto/memory-challenge#readme",
   "dependencies": {
-    "express": "^4.17.1"
+    "cookie-session": "^1.4.0",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "express-handlebars": "^5.3.0"
   },
   "devDependencies": {
     "eslint": "^7.25.0",
