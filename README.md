@@ -1,18 +1,10 @@
 # memory-challenge
 
-## Do you wanna play?
+### Do you wanna play?
 
-[TBD](https://link)
+### Install in your computer
 
-## Install in your computer
-
-### Download
-
-Can download the project with the simple command of `git clone`, this project don't have any special instructions.
-
-### Create environments variables
-
-Only need create the file `.dotenv`, following the contain of `.dotenv-example`
+Only download the project with the simple command of `git clone`.
 
 ### Install dependencies
 

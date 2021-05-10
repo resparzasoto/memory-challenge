@@ -7,6 +7,8 @@
     "doc": "doc"
   },
   "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -21,6 +23,11 @@
   },
   "homepage": "https://github.com/resparzasoto/memory-challenge#readme",
   "dependencies": {
+    "blessed": "^0.1.81",
+    "blessed-contrib": "^4.8.21",
     "random-words": "^1.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.7"
   }
 }

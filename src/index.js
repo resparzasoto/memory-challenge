@@ -1,212 +1,175 @@
 'use strict';
 
-const randomWords = require('random-words');
+const { EventEmitter } = require('events');
 
-const BLINK = 300;
-const MAX_TIME = 1500;
-const START_LEVEL = 1;
-const SUBLEVEL_TO_LEVEL_UP = 2;
-const GAME_OVER = 3;
-const MIN_WORD_LENGTH = 5;
-const MAX_WORD_LENGTH = 12;
+const Game = require('./Game');
 
-class Game {
-  constructor() {
-    this.initGame();
-  }
+const blessed = require('blessed');
+const contrib = require('blessed-contrib');
 
-  initGame = () => {
-    this.words = [];
-    this.gameConfiguration = {
-      level: 1,
-      subLevel: 0,
-      points: 0,
-      strikes: 0,
-      time: 1500,
-      wordLength: 5,
-      wordsForLevel: 3,
-    };
-    this.createWords();
+const screen = blessed.screen();
+const eventEmitter = new EventEmitter();
+
+const start = () => {
+  const game = new Game();
+
+  var levelBox, subLevelBox, rememberBox, strikesBox, startButton, prompt;
+
+  startButton = blessed.box({
+    content: 'START',
+    width: '13%',
+    height: '6%',
+    left: '50%',
+    right: '50%',
+    top: '45%',
+    align: 'center',
+    valign: 'center',
+    style: {
+      fg: 'black',
+      bg: 'white',
+    },
+  });
+
+  const welcomePage = (screen) => {
+    const grid = new contrib.grid({
+      rows: 10,
+      cols: 12,
+      screen,
+    });
+
+    grid.set(1, 1, 4, 10, blessed.text, {
+      fg: 'white',
+      align: 'center',
+      border: {
+        fg: 'blue',
+      },
+      label: 'Do you wanna play?',
+      content: 'Welcome, test your memory!',
+    });
+
+    grid.set(5, 3, 2, 6, blessed.text, {
+      fg: 'white',
+      bg: 'gray',
+      align: 'center',
+      border: {
+        fg: 'blue',
+      },
+      align: 'center',
+      valign: 'middle',
+      content: 'Move with -> to play!',
+    });
   };
 
-  levelUp = () => {
-    this.gameConfiguration.level++;
-    this.gameConfiguration.subLevel = 0;
-    this.gameConfiguration.time = this.calculateTimeDown();
-    this.gameConfiguration.wordLength = this.calculateWordLengthUp();
-    this.createWords();
+  const gamePage = (screen) => {
+    const grid = new contrib.grid({
+      rows: 10,
+      cols: 12,
+      screen: screen,
+    });
+
+    levelBox = grid.set(1, 1, 1, 3, blessed.text, {
+      label: 'LEVEL',
+      content: game.configuration.level.toString(),
+      align: 'center',
+    });
+
+    subLevelBox = grid.set(1, 5, 1, 3, blessed.text, {
+      label: 'SUBLEVEL',
+      content: game.configuration.subLevel.toString(),
+      align: 'center',
+    });
+
+    strikesBox = grid.set(1, 9, 1, 3, blessed.text, {
+      label: 'STRIKES',
+      content: game.configuration.strikes.toString(),
+      align: 'center',
+    });
+
+    rememberBox = grid.set(3, 4, 1, 5, blessed.text, {
+      hidden: true,
+      label: 'Remember',
+      shadow: true,
+      style: {
+        align: 'center',
+        fg: 'black',
+        bg: 'white',
+        border: {
+          fg: 'gray',
+        },
+      },
+    });
+
+    screen.append(startButton);
   };
 
-  levelDown = () => {
-    if (this.gameConfiguration.level === START_LEVEL) {
-      this.restartToStartLevel();
-    } else {
-      this.gameConfiguration.level--;
-      this.gameConfiguration.strikes++;
-      this.gameConfiguration.subLevel = 0;
-      this.gameConfiguration.time = this.calculateTimeUp();
-      this.gameConfiguration.wordLength = this.calculateWordLengthDown();
-      this.createWords();
-    }
-  };
+  startButton.on('click', (data) => {
+    prompt = blessed.prompt({
+      left: 'center',
+      top: 'center',
+      height: 'shrink',
+      width: 'shrink',
+      border: 'line',
+      style: {
+        fg: 'blue',
+        bg: 'black',
+        bold: true,
+        border: {
+          fg: 'blue',
+          bg: 'red',
+        },
+      },
+    });
 
-  subLevelUp = () => {
-    this.gameConfiguration.subLevel++;
-    this.gameConfiguration.points++;
+    screen.append(prompt);
+    startButton.hide();
 
-    if (this.gameConfiguration.subLevel === SUBLEVEL_TO_LEVEL_UP) {
-      this.levelUp();
-    }
-  };
+    eventEmitter.emit('randomWordEvent');
+  });
 
-  restartToStartLevel = () => {
-    this.gameConfiguration.subLevel = 0;
-    this.gameConfiguration.strikes++;
-    this.createWords();
-  };
+  eventEmitter.on('randomWordEvent', () => {
+    const currentWord = game.getWord();
 
-  calculateTimeDown = () => {
-    let newTime = Math.floor(this.gameConfiguration.time * 0.75);
+    rememberBox.setContent(currentWord);
+    rememberBox.show();
+    screen.render();
 
-    if (newTime < BLINK) {
-      return BLINK;
-    }
+    setTimeout(() => {
+      eventEmitter.emit('timeOutEvent', currentWord);
+    }, game.configuration.time);
+  });
 
-    return newTime;
-  };
+  eventEmitter.on('timeOutEvent', (currentWord) => {
+    rememberBox.hide();
 
-  calculateTimeUp = () => {
-    let newTime = Math.floor(this.gameConfiguration.time * 1.25);
+    prompt.readInput('Do you remember the word? ', '', (error, value) => {
+      game.isCorrectWord(value);
 
-    if (newTime > MAX_TIME) {
-      return MAX_TIME;
-    }
+      if (game.isGameOver()) {
+        return process.exit(0);
+      }
 
-    return newTime;
-  };
+      levelBox.setContent(game.configuration.level.toString());
+      subLevelBox.setContent(game.configuration.subLevel.toString());
+      strikesBox.setContent(game.configuration.strikes.toString());
+      screen.render();
 
-  calculateWordLengthUp = () => {
-    let wordLength = Math.ceil(this.gameConfiguration.wordLength * 1.25);
+      eventEmitter.emit('randomWordEvent');
+    });
 
-    if (wordLength > MAX_WORD_LENGTH) {
-      return MAX_WORD_LENGTH;
-    }
+    screen.render();
+  });
 
-    return wordLength;
-  };
+  screen.key(['escape', 'q', 'C-c'], (ch, key) => {
+    return process.exit(0);
+  });
 
-  calculateWordLengthDown = () => {
-    let wordLength = Math.ceil(this.gameConfiguration.wordLength * 0.75);
+  const carousel = new contrib.carousel([welcomePage, gamePage], {
+    screen: screen,
+    interval: 0,
+    controlKeys: true,
+  });
 
-    if (wordLength < MIN_WORD_LENGTH) {
-      return MIN_WORD_LENGTH;
-    }
+  carousel.start();
+};
 
-    return wordLength;
-  };
-
-  createWords = () => {
-    this.words = [];
-
-    for (let i = 0; i < this.gameConfiguration.wordsForLevel; i++) {
-      this.words.push(this.createWord());
-    }
-  };
-
-  createWord = () => {
-    let randomWord = '';
-
-    do {
-      const words = randomWords({
-        exactly: 1,
-        maxLength: this.gameConfiguration.wordLength,
-      });
-
-      randomWord = words[0];
-    } while (!this.isWordLengthValid(randomWord));
-
-    return randomWord;
-  };
-
-  isWordLengthValid = (word) =>
-    word.length === this.gameConfiguration.wordLength;
-
-  isCorrectWord = (word) => {
-    let isCorrect = false;
-
-    if (this.words[this.gameConfiguration.subLevel] === word) {
-      this.subLevelUp();
-      isCorrect = true;
-    } else {
-      this.levelDown();
-      isCorrect = false;
-    }
-
-    return isCorrect;
-  };
-
-  isGameOver = () => {
-    let isGameOver = false;
-
-    if (this.gameConfiguration.strikes === GAME_OVER) {
-      isGameOver = true;
-    }
-
-    return isGameOver;
-  };
-
-  getWord = () => this.words[this.gameConfiguration.subLevel];
-}
-
-const newGame = new Game();
-
-console.log(newGame.words);
-console.log(newGame.getWord());
-
-newGame.levelUp();
-
-console.log(newGame.gameConfiguration);
-console.log(newGame.words);
-console.log(newGame.getWord());
-
-newGame.levelUp();
-
-console.log(newGame.gameConfiguration);
-console.log(newGame.words);
-console.log(newGame.getWord());
-
-newGame.levelUp();
-
-console.log(newGame.gameConfiguration);
-console.log(newGame.words);
-console.log(newGame.getWord());
-
-newGame.levelDown();
-
-console.log(newGame.gameConfiguration);
-console.log(newGame.words);
-console.log(newGame.getWord());
-
-newGame.levelDown();
-
-console.log(newGame.gameConfiguration);
-console.log(newGame.words);
-console.log(newGame.getWord());
-
-newGame.levelDown();
-
-console.log(newGame.gameConfiguration);
-console.log(newGame.words);
-console.log(newGame.getWord());
-
-newGame.levelDown();
-
-console.log(newGame.gameConfiguration);
-console.log(newGame.words);
-console.log(newGame.getWord());
-
-newGame.levelDown();
-
-console.log(newGame.gameConfiguration);
-console.log(newGame.words);
-console.log(newGame.getWord());
+start();
